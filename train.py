@@ -40,8 +40,9 @@ def train(hyp, opt, device, tb_writer=None):
     os.makedirs(wdir, exist_ok=True)
     last = wdir / 'last.pt'
     best = wdir / 'best.pt'
-    last_sd = wdir / 'last_sd.pt'
-    best_sd = wdir / 'best_sd.pt'
+    if opt.state_dict:
+        last_sd = wdir / 'last_sd.pt'
+        best_sd = wdir / 'best_sd.pt'
     results_file = str(log_dir / 'results.txt')
     epochs, batch_size, total_batch_size, weights, rank = \
         opt.epochs, opt.batch_size, opt.total_batch_size, opt.weights, opt.global_rank
@@ -350,17 +351,21 @@ def train(hyp, opt, device, tb_writer=None):
                             'training_results': f.read(),
                             'model': ema.ema,
                             'optimizer': None if final_epoch else optimizer.state_dict()}
-                    ckpt1 = {'names': ema.ema.names,
-                             'yaml': ema.ema.yaml,
-                             'model_state_dict': ema.ema.module.state_dict() if hasattr(model, 'module') else ema.ema.state_dict()}
+                    if opt.state_dict:
+                        ckpt1 = {'names': ema.ema.names,
+                                 'yaml': ema.ema.yaml,
+                                 'model_state_dict': ema.ema.module.state_dict() if hasattr(model, 'module') else ema.ema.state_dict()}
                 # Save last, best and delete
                 torch.save(ckpt, last)
-                torch.save(ckpt1, last_sd)
+                if opt.state_dict:
+                    torch.save(ckpt1, last_sd)
                 if best_fitness == fi:
                     torch.save(ckpt, best)
-                    torch.save(ckpt1, best_sd)
+                    if opt.state_dict:
+                        torch.save(ckpt1, best_sd)
                 del ckpt
-                del ckpt1
+                if opt.state_dict:
+                    del ckpt1
         # end epoch ----------------------------------------------------------------------------------------------------
     # end training
 
@@ -411,6 +416,7 @@ if __name__ == '__main__':
     parser.add_argument('--local_rank', type=int, default=-1, help='DDP parameter, do not modify')
     parser.add_argument('--logdir', type=str, default='runs/', help='logging directory')
     parser.add_argument('--workers', type=int, default=8, help='maximum number of dataloader workers')
+    parser.add_argument('--state_dict', action='store_true', help='save best and last pytorch models as state_dict. ')
     opt = parser.parse_args()
 
     # Set DDP variables
